@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Med Calendar</title>
+
+    <link rel="apple-touch-icon" href="pillicon2.png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #007aff;
+            --success: #34c759;
+            --bg: #f2f2f7;
+            --card: #ffffff;
+            --text: #1c1c1e;
+            --secondary-text: #8e8e93;
+            --morning-icon: #ffcc00;
+            --afternoon-icon: #ff9500;
+            --night-icon: #5856d6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px; background-color: var(--bg); color: var(--text);
+            line-height: 1.2; -webkit-tap-highlight-color: transparent; margin: 0;
+            padding-bottom: 40px; /* Extra space for the art card */
+        }
+
+        .header-nav { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .my-pills-btn {
+            background: #e5e5ea; color: var(--primary); border: none;
+            padding: 10px 16px; border-radius: 20px; font-weight: 700;
+            font-size: 0.9rem; display: flex; align-items: center; gap: 8px; cursor: pointer;
+        }
+
+        .day-label { font-size: 3.5rem; font-weight: 900; letter-spacing: -1px; margin: 0; line-height: 1.1; }
+        .date-label { font-size: 1.5rem; font-weight: 600; color: var(--secondary-text); margin: 5px 0 25px 0; }
+
+        #success-banner {
+            display: none; background: var(--success); color: white; padding: 20px;
+            border-radius: 20px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(52, 199, 89, 0.25);
+            animation: slideIn 0.4s ease;
+        }
+        #success-banner h2 { margin: 0; font-size: 1.4rem; font-weight: 800; }
+        #success-banner p { margin: 5px 0 0 0; opacity: 0.95; font-weight: 600; font-size: 1rem; }
+
+        .med-card {
+            background: var(--card); border-radius: 20px; padding: 16px 20px; margin-bottom: 12px;
+            display: flex; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            border: 2px solid transparent; cursor: pointer; transition: transform 0.1s;
+        }
+        .med-card:active { transform: scale(0.98); }
+        .med-card.checked { background: #e5e5ea; opacity: 0.6; pointer-events: none; border-color: #d1d1d6; }
+
+        .check-circle {
+            width: 25px; height: 25px; border: 3px solid #d1d1d6; border-radius: 50%;
+            margin-right: 15px; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; background: white;
+        }
+        .checked .check-circle { background: var(--success); border-color: var(--success); }
+        .check-circle i { color: white; font-size: 1.2rem; display: none; }
+        .checked .check-circle i { display: block; }
+
+        .time-icon-box { font-size: 1.5rem; margin-right: 15px; width: 30px; text-align: center; }
+        .fa-sun { color: var(--morning-icon); }
+        .fa-cloud-sun { color: var(--afternoon-icon); }
+        .fa-moon { color: var(--night-icon); }
+
+        .med-info { display: flex; flex-direction: column; overflow: hidden; }
+        .med-name { font-size: 1.0rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .med-time { font-size: 0.8rem; color: var(--secondary-text); font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+
+       /* ART CARD STYLES */
+        .art-container {
+            margin-top: 40px; background: white; border-radius: 24px; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center;
+            position: relative;
+            /* Removed min-height so it hugs the image content strictly */
+        }
+        .art-image-wrapper {
+            width: 100%;
+            min-height: 200px; /* Keeps a placeholder size while loading */
+            background: #e5e5ea;
+            display: block;
+        }
+        .art-image-wrapper img {
+            width: 100%;
+            height: auto; /* Allows natural aspect ratio */
+            display: block; /* Removes bottom whitespace */
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .art-info { padding: 20px; text-align: left; }
+        .art-title { font-size: 1.1rem; font-weight: 800; margin: 0 0 5px 0; line-height: 1.3; }
+        .art-artist { font-size: 0.9rem; color: var(--secondary-text); font-weight: 500; margin: 0; }
+        .art-label {
+            position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.6);
+            color: white; padding: 5px 12px; border-radius: 15px;
+            font-size: 0.75rem; font-weight: 700; backdrop-filter: blur(4px);
+        }
+
+        .database { margin-top: 30px }
+        .database a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .database a:hover { text-decoration: underline; }
+
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 1000; padding: 20px; justify-content: center; align-items: center; }
+        .modal-body { background: white; border-radius: 28px; padding: 25px; max-height: 85vh; overflow-y: auto; position: relative; padding-top: 60px; width: 100%; max-width: 600px; }
+        .close-x { position: absolute; top: 15px; right: 15px; font-size: 1.4rem; color: var(--secondary-text); background: #f2f2f7; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .med-ref-item { padding: 15px 0; border-bottom: 1px solid #f2f2f7; }
+        .med-ref-item:last-child { border-bottom: none; }
+
+        @keyframes slideIn { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="header-nav">
+        <button class="my-pills-btn" onclick="toggleModal(true)">
+            <i class="fa-solid fa-circle-info"></i> My Pills
+        </button>
+    </div>
+
+    <div class="header-text">
+        <p id="display-day" class="day-label"></p>
+        <p id="display-date" class="date-label"></p>
+    </div>
+
+    <div id="success-banner">
+        <h2><i class="fa-solid fa-circle-check"></i> All set for today!</h2>
+        <p id="safety-text"></p>
+    </div>
+
+    <div id="med-list">
+        <div class="med-card" id="card-morning" onclick="handleCheck('morning')">
+            <div class="check-circle"><i class="fa-solid fa-check"></i></div>
+            <div class="time-icon-box"><i class="fa-solid fa-sun"></i></div>
+            <div class="med-info"><span class="med-time">Morning</span><span class="med-name">Metformin</span></div>
+        </div>
+        <div class="med-card" id="card-afternoon" onclick="handleCheck('afternoon')">
+            <div class="check-circle"><i class="fa-solid fa-check"></i></div>
+            <div class="time-icon-box"><i class="fa-solid fa-cloud-sun"></i></div>
+            <div class="med-info"><span class="med-time">Afternoon</span><span class="med-name">Metformin</span></div>
+        </div>
+        <div class="med-card" id="card-evening" onclick="handleCheck('evening')">
+            <div class="check-circle"><i class="fa-solid fa-check"></i></div>
+            <div class="time-icon-box"><i class="fa-solid fa-moon"></i></div>
+            <div class="med-info"><span class="med-time">Night</span><span class="med-name">Assorted pills</span></div>
+        </div>
+    </div>
+
+    <div class="art-container" id="art-container">
+        <div class="art-label"><i class="fa-solid fa-palette"></i> Daily Art</div>
+        <div class="art-image-wrapper">
+            <img id="art-img" alt="Daily Art" onload="this.style.opacity=1">
+        </div>
+        <div class="art-info">
+            <h3 class="art-title" id="art-title">Loading masterpiece...</h3>
+            <p class="art-artist" id="art-artist">Art Institute of Chicago</p>
+        </div>
+    </div>
+
+    <div class="database">
+        <a href="https://console.firebase.google.com/project/medcal-98acb/database/medcal-98acb-default-rtdb/data">Realtime database</a>
+    </div>
+
+    <div id="modal" onclick="toggleModal(false)">
+        <div class="modal-body" onclick="event.stopPropagation()">
+            <div class="close-x" onclick="toggleModal(false)"><i class="fa-solid fa-xmark"></i></div>
+            <h2 style="font-size: 1.8rem; font-weight: 800; margin-top: 0; color: var(--primary);"><i class="fa-solid fa-capsules"></i> Medication List</h2>
+            <p style="color: var(--secondary-text); margin-bottom: 20px; font-size: 0.9rem;">Last Updated: Dec 27, 2025</p>
+            <div class="med-ref-item"><strong>METFORMIN (500mg)</strong><br><span style="color: #444; font-size: 0.95rem;">Take 2 tablets in the morning and 2 in the afternoon.</span></div>
+            <div class="med-ref-item" style="background: #f9f9fb; padding: 15px; border-radius: 15px; border: 1px solid #e5e5ea; margin-top: 10px;">
+                <strong style="color: var(--night-icon);">Evening Cocktail (7 Pills Total)</strong><br>
+                <ul style="margin: 10px 0 0 20px; padding: 0; line-height: 1.6; font-size: 0.8rem; color: #333;">
+                    <li><strong>BISOPROLOL</strong> (2.5mg) — <b>3 per day</b></li>
+                    <li><strong>ROUSVASTATIN</strong> (10mg)</li>
+                    <li><strong>PANTOPRAZOLE</strong> (40mg)</li>
+                    <li><strong>CANDESARTAN</strong> (16mg)</li>
+                    <li><strong>MIRABEGRON</strong> (50mg)</li>
+                    <li><strong>CLOPIDOGREL BISULF</strong> (75mg)</li>
+                    <li><strong>MIRTAZAPINE</strong> (15mg) — <b>1/2 tablet</b></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // --- PASTE YOUR FIREBASE CONFIG HERE ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBDQXskd8BvS2zp-QGe76qHpdFN7KrlUps",
+          authDomain: "medcal-98acb.firebaseapp.com",
+          projectId: "medcal-98acb",
+          storageBucket: "medcal-98acb.firebasestorage.app",
+          messagingSenderId: "718501385348",
+          appId: "1:718501385348:web:7910bd750c1d2f46fe9ed1",
+          measurementId: "G-47QK412YT2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- GLOBAL STATE ---
+        let activeDateKey = "";
+        let currentUnsubscribe = null;
+
+        // --- ART FETCHING LOGIC (Art Institute of Chicago API) ---
+        async function fetchDailyArt() {
+            try {
+                // 1. Generate a random page number (1-100) to find a random painting
+                const randomPage = Math.floor(Math.random() * 100) + 1;
+
+                // 2. Fetch from Art Institute API (Paintings, Public Domain only)
+                const response = await fetch(`https://api.artic.edu/api/v1/artworks/search?q=painting&query[term][is_public_domain]=true&fields=id,title,artist_display,image_id&limit=1&page=${randomPage}`);
+                const data = await response.json();
+
+                if (data && data.data && data.data.length > 0) {
+                    const art = data.data[0];
+                    const imageUrl = `https://www.artic.edu/iiif/2/${art.image_id}/full/843,/0/default.jpg`;
+
+                    document.getElementById('art-img').src = imageUrl;
+                    document.getElementById('art-title').innerText = art.title;
+                    document.getElementById('art-artist').innerText = art.artist_display || "Unknown Artist";
+                }
+            } catch (error) {
+                console.error("Failed to load art:", error);
+                document.getElementById('art-container').style.display = 'none'; // Hide if fails
+            }
+        }
+
+
+
+
+        // --- MAIN SETUP FUNCTION ---
+        function setupToday() {
+            const now = new Date(Date.now() - (3 * 60 * 60 * 1000));
+
+
+
+            // --- TIME TRAVEL TEST: UNCOMMENT TO TEST TOMORROW ---
+            // now.setDate(now.getDate() + 1);
+            // ----------------------------------------------------
+
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const newDateKey = `${year}-${month}-${day}`;
+
+            if (newDateKey === activeDateKey) return;
+
+            activeDateKey = newDateKey;
+
+            // Update Text
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            document.getElementById('display-day').innerText = days[now.getDay()];
+            document.getElementById('display-date').innerText = months[now.getMonth()] + " " + now.getDate();
+            document.getElementById('safety-text').innerText = "It is still " + days[now.getDay()] + ". No more pills needed tonight.";
+
+            // Switch Listener
+            if (currentUnsubscribe) { currentUnsubscribe(); currentUnsubscribe = null; }
+
+            const medsRef = ref(db, 'meds/' + activeDateKey);
+            currentUnsubscribe = onValue(medsRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                updateStatus('morning', data.morning);
+                updateStatus('afternoon', data.afternoon);
+                updateStatus('evening', data.evening);
+
+                if (data.morning && data.afternoon && data.evening) {
+                    document.getElementById('success-banner').style.display = 'block';
+                } else {
+                    document.getElementById('success-banner').style.display = 'none';
+                }
+            });
+
+            // Fetch new art for the new day
+            fetchDailyArt();
+        }
+
+        function updateStatus(id, isTaken) {
+            const card = document.getElementById('card-' + id);
+            if (isTaken) {
+                if (!card.classList.contains('checked')) card.classList.add('checked');
+            } else {
+                card.classList.remove('checked');
+            }
+        }
+
+        // --- INIT ---
+        setupToday();
+
+        // Auto-refresh when opening app or crossing midnight
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === 'visible') setupToday();
+        });
+        setInterval(setupToday, 60000);
+
+        // --- CLICK HANDLERS ---
+        window.handleCheck = function(id) {
+            if (!activeDateKey) return;
+            set(ref(db, 'meds/' + activeDateKey + '/' + id), true);
+            confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 } });
+        }
+
+        window.toggleModal = function(show) {
+            document.getElementById('modal').style.display = show ? 'flex' : 'none';
+        }
+    </script>
+</body>
+</html>
