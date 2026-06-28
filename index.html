@@ -211,29 +211,62 @@
         let currentUnsubscribe = null;
 
         // --- ART FETCHING LOGIC (Art Institute of Chicago API) ---
-        async function fetchDailyArt() {
-            try {
-                // 1. Generate a random page number (1-100) to find a random painting
-                const randomPage = Math.floor(Math.random() * 100) + 1;
+     // We add a 'retryCount' parameter, defaulting to 0
+async function fetchDailyArt() {
+    try {
+        // 1. Search The Met's collection for paintings that have images
+        // We use "hasImages=true" to ensure we only get artworks with pictures
+        const searchUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&medium=Paintings&q=Art`;
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
 
-                // 2. Fetch from Art Institute API (Paintings, Public Domain only)
-                const response = await fetch(`https://api.artic.edu/api/v1/artworks/search?q=painting&query[term][is_public_domain]=true&fields=id,title,artist_display,image_id&limit=1&page=${randomPage}`);
-                const data = await response.json();
-
-                if (data && data.data && data.data.length > 0) {
-                    const art = data.data[0];
-                    const imageUrl = `https://www.artic.edu/iiif/2/${art.image_id}/full/843,/0/default.jpg`;
-
-                    document.getElementById('art-img').src = imageUrl;
-                    document.getElementById('art-title').innerText = art.title;
-                    document.getElementById('art-artist').innerText = art.artist_display || "Unknown Artist";
-                }
-            } catch (error) {
-                console.error("Failed to load art:", error);
-                document.getElementById('art-container').style.display = 'none'; // Hide if fails
-            }
+        if (!searchData || !searchData.objectIDs || searchData.objectIDs.length === 0) {
+            console.warn("No artworks found from The Met.");
+            return;
         }
 
+        // 2. Pick a random artwork ID from the search results
+        const randomId = searchData.objectIDs[Math.floor(Math.random() * searchData.objectIDs.length)];
+
+        // 3. Fetch the specific details and image URL for that artwork ID
+        const objectUrl = `https://collectionapi.metmuseum.org/public/collection/v1/objects/${randomId}`;
+        const objectResponse = await fetch(objectUrl);
+        const art = await objectResponse.json();
+
+        // Check if the artwork has a primary image, if not, try again
+        if (!art.primaryImageSmall && !art.primaryImage) {
+            console.warn("Selected artwork has no valid image, retrying...");
+            fetchDailyArt();
+            return;
+        }
+
+        const imageUrl = art.primaryImageSmall || art.primaryImage;
+        const img = document.getElementById('art-img');
+
+        // Update the user interface text
+        document.getElementById('art-title').innerText = art.title || "Untitled";
+        document.getElementById('art-artist').innerText = art.artistDisplayName || "Unknown Artist";
+
+        img.style.opacity = 0;
+        img.style.display = 'block';
+
+        img.onload = () => {
+            img.style.opacity = 1;
+        };
+
+        img.onerror = () => {
+            console.warn("Image failed to load, selecting a fallback...");
+            fetchDailyArt();
+        };
+
+        img.src = imageUrl;
+
+    } catch (error) {
+        console.error("Art fetch failed:", error);
+        document.getElementById('art-title').innerText = "Artwork Unavailable";
+        document.getElementById('art-artist').innerText = "Could not connect to The Met";
+    }
+}
 
 
 
